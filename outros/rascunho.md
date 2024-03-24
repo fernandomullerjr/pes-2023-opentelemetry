@@ -112,5 +112,239 @@ root@debian10x64:/home/fernando/cursos/idp-devportal/backstage/deploy-ambiente/d
 
 
 
+
+- Subir stack do projeto PES - OpenTelemetry.
+
+- ERRO
+
+~~~~bash
+root@debian10x64:/home/fernando/cursos/opentelemetry/pes-2023-opentelemetry# kubectl apply -f 01-backend.yaml
+namespace/observability-backend created
+secret/loki-config created
+service/loki created
+statefulset.apps/loki created
+configmap/tempo created
+error: error validating "01-backend.yaml": error validating data: ValidationError(Service): unknown field "data" in io.k8s.api.core.v1.Service; if you choose to ignore these errors, turn validation off with --validate=false
+root@debian10x64:/home/fernando/cursos/opentelemetry/pes-2023-opentelemetry#
+~~~~
+
+
+
+- Ajustado
+
+aplicando
+
+~~~~bash
+
+root@debian10x64:/home/fernando/cursos/opentelemetry/pes-2023-opentelemetry# kubectl apply -f 01-backend.yaml
+namespace/observability-backend unchanged
+secret/loki-config unchanged
+service/loki unchanged
+statefulset.apps/loki configured
+configmap/tempo configured
+service/tempo created
+deployment.apps/tempo created
+configmap/mimir created
+service/mimir created
+statefulset.apps/mimir created
+configmap/dashboards-demo-0 created
+configmap/grafana-config created
+configmap/grafana-dashboard-provisioning created
+configmap/grafana-dashboards created
+configmap/grafana-dashboards-demo created
+configmap/grafana-datasources created
+configmap/grafana-notification-channels created
+service/grafana created
+deployment.apps/grafana created
+root@debian10x64:/home/fernando/cursos/opentelemetry/pes-2023-opentelemetry#
+
+~~~~
+
+
+
+
+- Abra uma conexão com o serviço do Grafana em uma outra sessão do terminal: 
+
+````bash
+kubectl port-forward -n observability-backend svc/grafana 3000:3000
+````
+
+
+root@debian10x64:/home/fernando# kubectl port-forward -n observability-backend svc/grafana 3000:3000
+error: unable to forward port because pod is not running. Current status=Pending
+root@debian10x64:/home/fernando# kubectl get pods -A
+NAMESPACE               NAME                                  READY   STATUS    RESTARTS   AGE
+kube-system             cilium-operator-788c4f69bc-qndg8      1/1     Running   0          9m13s
+kube-system             cilium-xqtsm                          1/1     Running   0          9m13s
+kube-system             coredns-5dd5756b68-7vdkb              1/1     Running   0          27d
+kube-system             coredns-5dd5756b68-84rbg              1/1     Running   0          27d
+kube-system             etcd-debian10x64                      1/1     Running   1137       27d
+kube-system             kube-apiserver-debian10x64            1/1     Running   23         27d
+kube-system             kube-controller-manager-debian10x64   1/1     Running   24         27d
+kube-system             kube-proxy-kx4h5                      1/1     Running   23         27d
+kube-system             kube-scheduler-debian10x64            1/1     Running   25         27d
+observability-backend   grafana-65888b98d-w664v               0/1     Pending   0          2m48s
+observability-backend   loki-0                                0/1     Pending   0          5m46s
+observability-backend   mimir-0                               0/1     Pending   0          2m48s
+observability-backend   tempo-694776547f-t5m5h                0/1     Pending   0          2m48s
+
+
+Events:
+  Type     Reason            Age    From               Message
+  ----     ------            ----   ----               -------
+  Warning  FailedScheduling  3m18s  default-scheduler  0/1 nodes are available: 1 node(s) had untolerated taint {node-role.kubernetes.io/control-plane: }. preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling..
+root@debian10x64:/home/fernando# kubectl get nodes
+NAME          STATUS   ROLES           AGE   VERSION
+debian10x64   Ready    control-plane   27d   v1.28.1
+root@debian10x64:/home/fernando#
+
+
+
+
+
+
+
+
+
+
+
+##  ChatGPT 3.5
+ 
+User
+como resolver o problema do pod com erro "Warning  FailedScheduling  3m18s  default-scheduler  0/1 nodes are available: 1 node(s) had untolerated taint {node-role.kubernetes.io/control-plane: }. preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling.."?
+ChatGPT
+
+Esse aviso indica que o Kubernetes não conseguiu agendar um pod porque não há nós disponíveis que possam tolerar as condições especificadas no pod. No seu caso, parece que o único nó disponível tem uma taint que não é tolerada pelo pod.
+
+Você pode resolver esse problema de várias maneiras:
+
+    Remova a taint do nó: Se o nó com a taint não é crítico para executar apenas componentes do plano de controle, você pode remover a taint para tornar o nó disponível para outros pods. Você pode fazer isso executando o seguinte comando:
+
+    bash
+
+kubectl taint nodes <nome_do_nó> node-role.kubernetes.io/control-plane:NoSchedule-
+
+Substitua <nome_do_nó> pelo nome do nó que possui a taint que você deseja remover.
+
+Adicione tolerâncias ao seu pod: Se não for possível ou desejável remover a taint do nó, você pode adicionar tolerâncias ao seu pod para permitir que ele seja agendado em nós com taints específicas. Você pode fazer isso adicionando a seguinte seção ao manifesto do seu pod:
+
+yaml
+
+tolerations:
+- key: "node-role.kubernetes.io/control-plane"
+  operator: "Exists"
+  effect: "NoSchedule"
+
+Isso permite que o pod seja agendado em nós com a taint node-role.kubernetes.io/control-plane.
+
+
+
+
+
+
+- ANTES
+
+
+root@debian10x64:/home/fernando# kubectl describe node debian10x64
+Name:               debian10x64
+Roles:              control-plane
+Labels:             beta.kubernetes.io/arch=amd64
+                    beta.kubernetes.io/os=linux
+                    kubernetes.io/arch=amd64
+                    kubernetes.io/hostname=debian10x64
+                    kubernetes.io/os=linux
+                    node-role.kubernetes.io/control-plane=
+                    node.kubernetes.io/exclude-from-external-load-balancers=
+Annotations:        kubeadm.alpha.kubernetes.io/cri-socket: unix:///var/run/crio/crio.sock
+                    node.alpha.kubernetes.io/ttl: 0
+                    volumes.kubernetes.io/controller-managed-attach-detach: true
+CreationTimestamp:  Sun, 25 Feb 2024 13:23:34 -0300
+Taints:             node-role.kubernetes.io/control-plane:NoSchedule
+Unschedulable:      false
+
+
+
+- Ajuste
+
+
+kubectl taint nodes <nome_do_nó> node-role.kubernetes.io/control-plane:NoSchedule-
+kubectl taint nodes debian10x64 node-role.kubernetes.io/control-plane:NoSchedule-
+
+
+root@debian10x64:/home/fernando# kubectl taint nodes debian10x64 node-role.kubernetes.io/control-plane:NoSchedule-
+node/debian10x64 untainted
+root@debian10x64:/home/fernando# DATE
+bash: DATE: command not found
+root@debian10x64:/home/fernando# date
+Sat 23 Mar 2024 10:18:24 PM -03
+root@debian10x64:/home/fernando#
+
+
+
+- DEPOIS
+
+root@debian10x64:/home/fernando# kubectl describe node debian10x64
+Name:               debian10x64
+Roles:              control-plane
+Labels:             beta.kubernetes.io/arch=amd64
+                    beta.kubernetes.io/os=linux
+                    kubernetes.io/arch=amd64
+                    kubernetes.io/hostname=debian10x64
+                    kubernetes.io/os=linux
+                    node-role.kubernetes.io/control-plane=
+                    node.kubernetes.io/exclude-from-external-load-balancers=
+Annotations:        kubeadm.alpha.kubernetes.io/cri-socket: unix:///var/run/crio/crio.sock
+                    node.alpha.kubernetes.io/ttl: 0
+                    volumes.kubernetes.io/controller-managed-attach-detach: true
+CreationTimestamp:  Sun, 25 Feb 2024 13:23:34 -0300
+Taints:             <none>
+Unschedulable:      false
+
+
+
+
+
+
+- OK, Pod do Grafana subiu.
+
+- Porém tem pods em pending:
+
+~~~~bash
+
+root@debian10x64:/home/fernando# kubectl get pods -A -w
+NAMESPACE               NAME                                  READY   STATUS    RESTARTS   AGE
+kube-system             cilium-operator-788c4f69bc-qndg8      1/1     Running   0          22m
+kube-system             cilium-xqtsm                          1/1     Running   0          22m
+kube-system             coredns-5dd5756b68-7vdkb              1/1     Running   0          27d
+kube-system             coredns-5dd5756b68-84rbg              1/1     Running   0          27d
+kube-system             etcd-debian10x64                      1/1     Running   1137       27d
+kube-system             kube-apiserver-debian10x64            1/1     Running   23         27d
+kube-system             kube-controller-manager-debian10x64   1/1     Running   24         27d
+kube-system             kube-proxy-kx4h5                      1/1     Running   23         27d
+kube-system             kube-scheduler-debian10x64            1/1     Running   25         27d
+observability-backend   grafana-65888b98d-w664v               1/1     Running   0          15m
+observability-backend   loki-0                                0/1     Pending   0          18m
+observability-backend   mimir-0                               0/1     Pending   0          15m
+observability-backend   tempo-694776547f-t5m5h                1/1     Running   0          15m
+
+
+^Croot@debian10x64:/home/fernando# kubectl describe pod loki-0 -n observability-backend
+Name:           loki-0
+Namespace:      observability-backend
+
+Events:
+  Type     Reason            Age                From               Message
+  ----     ------            ----               ----               -------
+  Warning  FailedScheduling  18m                default-scheduler  0/1 nodes are available: pod has unbound immediate PersistentVolumeClaims. preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling..
+  Warning  FailedScheduling  10m (x2 over 15m)  default-scheduler  0/1 nodes are available: pod has unbound immediate PersistentVolumeClaims. preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling..
+root@debian10x64:/home/fernando#
+
+~~~~
+
+
+
+
 ## PENDENTE
+- TSHOOT, pods do Loki, Mimir.
+            default-scheduler  0/1 nodes are available: pod has unbound immediate PersistentVolumeClaims. preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling..
 - Subir stack do projeto PES - OpenTelemetry.

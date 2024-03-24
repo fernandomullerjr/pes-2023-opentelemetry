@@ -99,33 +99,6 @@ kind: ConfigMap
 metadata:
   name: tempo
   namespace: observability-backend
----
-apiVersion: v1
-kind: Service
-metadata:
-  labels:
-    name: tempo
-  name: tempo
-  namespace: observability-backend
-spec:
-  ports:
-  - name: tempo-prom-metrics
-    port: 3200
-    targetPort: 3200
-  - name: tempo-otlp
-    port: 55680
-    protocol: TCP
-    targetPort: 55680
-  - name: http
-    port: 80
-    targetPort: 3200
-  - name: receiver
-    port: 6831
-    protocol: UDP
-    targetPort: 6831
-  selector:
-    app: tempo
-    name: tempo
 data:
   overrides.yaml: |
     overrides:
@@ -155,6 +128,33 @@ data:
                 path: /tmp/tempo/traces
             wal:
                 path: /var/tempo/wal
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    name: tempo
+  name: tempo
+  namespace: observability-backend
+spec:
+  ports:
+  - name: tempo-prom-metrics
+    port: 3200
+    targetPort: 3200
+  - name: tempo-otlp
+    port: 55680
+    protocol: TCP
+    targetPort: 55680
+  - name: http
+    port: 80
+    targetPort: 3200
+  - name: receiver
+    port: 6831
+    protocol: UDP
+    targetPort: 6831
+  selector:
+    app: tempo
+    name: tempo
 ---
 apiVersion: apps/v1
 kind: Deployment
