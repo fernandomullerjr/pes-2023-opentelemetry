@@ -13,6 +13,35 @@ type: Opaque
 data:
   loki.yaml: YXV0aF9lbmFibGVkOiBmYWxzZQpjaHVua19zdG9yZV9jb25maWc6CiAgICBtYXhfbG9va19iYWNrX3BlcmlvZDogMAppbmdlc3RlcjoKICAgIGNodW5rX2Jsb2NrX3NpemU6IDI2MjE0NAogICAgY2h1bmtfaWRsZV9wZXJpb2Q6IDNtCiAgICBjaHVua19yZXRhaW5fcGVyaW9kOiAxbQogICAgbGlmZWN5Y2xlcjoKICAgICAgICByaW5nOgogICAgICAgICAgICBrdnN0b3JlOgogICAgICAgICAgICAgICAgc3RvcmU6IGlubWVtb3J5CiAgICAgICAgICAgIHJlcGxpY2F0aW9uX2ZhY3RvcjogMQpsaW1pdHNfY29uZmlnOgogICAgZW5mb3JjZV9tZXRyaWNfbmFtZTogZmFsc2UKICAgIHJlamVjdF9vbGRfc2FtcGxlczogdHJ1ZQogICAgcmVqZWN0X29sZF9zYW1wbGVzX21heF9hZ2U6IDE2OGgKc2NoZW1hX2NvbmZpZzoKICAgIGNvbmZpZ3M6CiAgICAgICAgLSBmcm9tOiAiMjAxOC0wNC0xNSIKICAgICAgICAgIGluZGV4OgogICAgICAgICAgICBwZXJpb2Q6IDE2OGgKICAgICAgICAgICAgcHJlZml4OiBpbmRleF8KICAgICAgICAgIG9iamVjdF9zdG9yZTogZmlsZXN5c3RlbQogICAgICAgICAgc2NoZW1hOiB2OQogICAgICAgICAgc3RvcmU6IGJvbHRkYgpzZXJ2ZXI6CiAgICBodHRwX2xpc3Rlbl9wb3J0OiAzMTAwCnN0b3JhZ2VfY29uZmlnOgogICAgYm9sdGRiOgogICAgICAgIGRpcmVjdG9yeTogL2RhdGEvbG9raS9pbmRleAogICAgZmlsZXN5c3RlbToKICAgICAgICBkaXJlY3Rvcnk6IC9kYXRhL2xva2kvY2h1bmtzCnRhYmxlX21hbmFnZXI6CiAgICByZXRlbnRpb25fZGVsZXRlc19lbmFibGVkOiBmYWxzZQogICAgcmV0ZW50aW9uX3BlcmlvZDogMAo=
 ---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: local-storage
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: local-pv
+spec:
+  capacity:
+    storage: 12Gi
+  accessModes:
+  - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Recycle
+  storageClassName: local-storage
+  local:
+    path: /data
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - your-node-name
+---
 apiVersion: v1
 kind: Service
 metadata:
@@ -90,6 +119,7 @@ spec:
     spec:
       accessModes:
       - ReadWriteOnce
+      storageClassName: local-storage
       resources:
         requests:
           storage: 10Gi
@@ -314,6 +344,7 @@ spec:
     spec:
       accessModes:
       - ReadWriteOnce
+      storageClassName: local-storage
       resources:
         requests:
           storage: 1Gi

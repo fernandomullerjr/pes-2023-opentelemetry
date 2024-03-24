@@ -371,6 +371,27 @@ root@debian10x64:/home/fernando# kubectl get pv -A
 No resources found
 root@debian10x64:/home/fernando#
 
+
+root@debian10x64:/home/fernando# kubectl describe pvc loki-data-loki-0 -n observability-backend
+Name:          loki-data-loki-0
+Namespace:     observability-backend
+StorageClass:
+Status:        Pending
+Volume:
+Labels:        name=loki
+Annotations:   <none>
+Finalizers:    [kubernetes.io/pvc-protection]
+Capacity:
+Access Modes:
+VolumeMode:    Filesystem
+Used By:       loki-0
+Events:
+  Type    Reason         Age                    From                         Message
+  ----    ------         ----                   ----                         -------
+  Normal  FailedBinding  14h (x82 over 15h)     persistentvolume-controller  no persistent volumes available for this claim and no storage class is set
+  Normal  FailedBinding  2m57s (x122 over 32m)  persistentvolume-controller  no persistent volumes available for this claim and no storage class is set
+
+
 ~~~~
 
 yaml consta o pvc, porém identação e organização tá errada
@@ -426,6 +447,680 @@ yaml consta o pvc, porém identação e organização tá errada
         requests:
           storage: 1Gi
 ~~~~
+
+
+
+
+
+
+Criando StorageClass e PersistentVolume para Uso Local no Kubernetes
+
+Para usar armazenamento local em seus pods do Kubernetes, você precisa criar uma StorageClass e um PersistentVolume (PV). Aqui estão os passos para realizar isso:
+
+Criando a StorageClass:
+
+    Defina o YAML da StorageClass: Crie um arquivo YAML com a seguinte estrutura:
+
+YAML
+
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: local-storage
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+
+Use o código com cuidado.
+
+    Nome: Substitua "local-storage" pelo nome desejado para sua StorageClass.
+    Provisioner: Utilize kubernetes.io/no-provisioner para indicar que você gerenciará manualmente a criação de PVs.
+    VolumeBindingMode: Defina como WaitForFirstConsumer para garantir que o PV seja criado antes de ser utilizado por um pod.
+
+    Aplique a StorageClass: Use o comando kubectl create -f <storage_class.yaml> para criar a StorageClass no seu cluster.
+
+Criando o PersistentVolume:
+
+    Defina o YAML do PersistentVolume: Crie um arquivo YAML com a seguinte estrutura:
+
+YAML
+
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: local-pv
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes:
+  - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Recycle
+  storageClassName: local-storage
+  local:
+    path: /data
+
+Use o código com cuidado.
+
+    Nome: Substitua "local-pv" pelo nome desejado para seu PV.
+    Capacidade: Defina a quantidade de armazenamento desejada para o PV (por exemplo, 10Gi).
+    AccessModes: Especifique os modos de acesso permitidos para o PV (por exemplo, ReadWriteOnce).
+    PersistentVolumeReclaimPolicy: Escolha a política de reutilização do PV após a exclusão de um pod (por exemplo, Recycle).
+    StorageClassName: Vincule o PV à StorageClass criada anteriormente.
+    Local: Especifique o caminho no diretório local onde o volume será armazenado.
+
+    Aplique o PersistentVolume: Use o comando kubectl create -f <pv.yaml> para criar o PV no seu cluster.
+
+Observações:
+
+    Certifique-se de que o diretório especificado no campo local.path do PV exista e tenha permissões de leitura/escrita para o pod que utilizará o volume.
+    Se você precisar de mais flexibilidade na criação de PVs, pode utilizar provisioners específicos, como o nfs-provisioner para provisionar volumes NFS. Consulte a documentação do Kubernetes para mais informações sobre provisioners [invalid URL removed].
+
+Com a StorageClass e o PV configurados, você pode criar pods que utilizem o armazenamento local. No PVC do pod, especifique a StorageClass "local-storage" para garantir que o pod seja agendado em um nó com acesso ao diretório local especificado.
+
+
+
+
+
+- Ajustando backend, criando manifesto para StorageClass e para o PV:
+
+pes-2023-opentelemetry/01-backend.yaml
+
+~~~~yaml
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: local-storage
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: local-pv
+spec:
+  capacity:
+    storage: 12Gi
+  accessModes:
+  - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Recycle
+  storageClassName: local-storage
+  local:
+    path: /data
+~~~~
+
+
+
+- ERRO
+
+~~~~BASH
+
+root@debian10x64:/home/fernando# kubectl apply -f /home/fernando/cursos/opentelemetry/pes-2023-opentelemetry/01-backend.yaml
+namespace/observability-backend unchanged
+secret/loki-config unchanged
+storageclass.storage.k8s.io/local-storage created
+service/loki unchanged
+statefulset.apps/loki configured
+configmap/tempo unchanged
+service/tempo unchanged
+deployment.apps/tempo configured
+configmap/mimir unchanged
+service/mimir unchanged
+statefulset.apps/mimir configured
+configmap/dashboards-demo-0 configured
+configmap/grafana-config unchanged
+configmap/grafana-dashboard-provisioning unchanged
+configmap/grafana-dashboards unchanged
+configmap/grafana-dashboards-demo unchanged
+configmap/grafana-datasources configured
+configmap/grafana-notification-channels configured
+service/grafana unchanged
+deployment.apps/grafana unchanged
+The PersistentVolume "local-pv" is invalid: spec.nodeAffinity: Required value: Local volume requires node affinity
+root@debian10x64:/home/fernando#
+
+~~~~
+
+
+
+"The PersistentVolume "local-pv" is invalid: spec.nodeAffinity: Required value: Local volume requires node affinity"
+
+
+You're right, there is an error in the provided PersistentVolume (PV) definition for local storage. Local volumes require node affinity to be specified, but the example included it incorrectly. Here's how to fix it:
+
+The Issue:
+
+The provided YAML included nodeAffinity under the spec section. However, local volumes require nodeAffinity within the local section itself.
+
+Solution:
+
+Here's the corrected YAML definition for your local PV:
+YAML
+
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: local-pv
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes:
+  - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Recycle
+  storageClassName: local-storage
+  local:
+    path: /data
+    # Node Affinity definition moved here
+    nodeAffinity:
+      required:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: kubernetes.io/hostname
+            operator: In
+            values:
+            - "<node_name>"  # Replace with the actual hostname of your node
+
+Use o código com cuidado.
+
+Explanation:
+
+    The nodeAffinity section is now nested within the local section.
+    Inside nodeAffinity.required.nodeSelectorTerms.matchExpressions, you need to specify the hostname of the node where this PV will be available. Replace <node_name> with the actual hostname of the Kubernetes worker node where you want to use this local storage.
+
+Important Notes:
+
+    This approach creates a local PV usable only on a single node. If you want the PV to be available on multiple nodes, you'll need to create separate PVs with the hostname of each node.
+    Local volumes are not recommended for production environments due to data loss if the node fails. Consider using network-attached storage (NAS) or cloud storage for persistent data across nodes.
+
+By making this correction and specifying the node hostname, your local PV should be valid and usable by your pods on the designated node.
+
+
+
+
+
+
+
+
+
+ERRO
+
+"The PersistentVolume "local-pv" is invalid: spec.nodeAffinity: Required value: Local volume requires node affinity"
+ChatGPT
+
+O erro indica que o volume persistente "local-pv" é inválido devido a um problema com a especificação de nodeAffinity. Isso ocorre porque os volumes locais no Kubernetes requerem afinidade de nó (node affinity) para garantir que o volume seja montado apenas no nó específico onde os dados estão localizados.
+
+Para resolver esse problema, você precisará adicionar a afinidade de nó à definição do PersistentVolume (PV). Aqui está um exemplo de como você pode fazer isso:
+
+yaml
+
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: local-pv
+spec:
+  capacity:
+    storage: 10Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-storage
+  local:
+    path: /path/to/local/volume
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - your-node-name
+
+Substitua "/path/to/local/volume" pelo caminho real do volume local em seu nó e "your-node-name" pelo nome do nó onde o volume está presente.
+
+Certifique-se de ajustar o valor de "path" e "your-node-name" conforme necessário para corresponder à sua configuração específica.
+
+Após fazer essas alterações, aplique a definição do PersistentVolume (PV) novamente e o erro deve ser resolvido.
+
+
+
+
+- Ajustando
+
+pes-2023-opentelemetry/01-backend.yaml
+
+~~~~yaml
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: local-pv
+spec:
+  capacity:
+    storage: 12Gi
+  accessModes:
+  - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Recycle
+  storageClassName: local-storage
+  local:
+    path: /opt/data-pv
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - your-node-name
+~~~~
+
+
+
+
+root@debian10x64:/home/fernando# kubectl apply -f /home/fernando/cursos/opentelemetry/pes-2023-opentelemetry/01-backend.yaml
+namespace/observability-backend unchanged
+secret/loki-config unchanged
+storageclass.storage.k8s.io/local-storage unchanged
+persistentvolume/local-pv created
+service/loki unchanged
+statefulset.apps/loki configured
+configmap/tempo unchanged
+service/tempo unchanged
+deployment.apps/tempo configured
+configmap/mimir unchanged
+service/mimir unchanged
+statefulset.apps/mimir configured
+configmap/dashboards-demo-0 configured
+configmap/grafana-config unchanged
+configmap/grafana-dashboard-provisioning unchanged
+configmap/grafana-dashboards unchanged
+configmap/grafana-dashboards-demo unchanged
+configmap/grafana-datasources configured
+configmap/grafana-notification-channels configured
+service/grafana unchanged
+deployment.apps/grafana unchanged
+root@debian10x64:/home/fernando#
+root@debian10x64:/home/fernando# date
+Sun 24 Mar 2024 01:32:29 PM -03
+root@debian10x64:/home/fernando#
+
+
+
+
+root@debian10x64:/home/fernando# kubectl get pv -A
+NAME       CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS      CLAIM   STORAGECLASS    REASON   AGE
+local-pv   12Gi       RWO            Recycle          Available           local-storage            17s
+root@debian10x64:/home/fernando#
+root@debian10x64:/home/fernando#
+root@debian10x64:/home/fernando# kubectl get pvc -A
+NAMESPACE               NAME                 STATUS    VOLUME   CAPACITY   ACCESS MODES   STORAGECLASS   AGE
+observability-backend   loki-data-loki-0     Pending                                                     15h
+observability-backend   mimir-data-mimir-0   Pending                                                     15h
+root@debian10x64:/home/fernando# date
+Sun 24 Mar 2024 01:32:48 PM -03
+root@debian10x64:/home/fernando#
+
+
+root@debian10x64:/home/fernando# kubectl describe pvc loki-data-loki-0 -n observability-backend
+Name:          loki-data-loki-0
+Namespace:     observability-backend
+StorageClass:
+Status:        Pending
+Volume:
+Labels:        name=loki
+Annotations:   <none>
+Finalizers:    [kubernetes.io/pvc-protection]
+Capacity:
+Access Modes:
+VolumeMode:    Filesystem
+Used By:       loki-0
+Events:
+  Type    Reason         Age               From                         Message
+  ----    ------         ----              ----                         -------
+  Normal  FailedBinding  7s (x4 over 45s)  persistentvolume-controller  no persistent volumes available for this claim and no storage class is set
+root@debian10x64:/home/fernando# kubectl get storageclass
+NAME            PROVISIONER                    RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
+local-storage   kubernetes.io/no-provisioner   Delete          WaitForFirstConsumer   false                  74s
+root@debian10x64:/home/fernando#
+root@debian10x64:/home/fernando#
+
+
+
+
+
+pvc segue com status "pending".
+erro "no persistent volumes available for this claim and no storage class is set"
+ChatGPT
+
+Se o PVC está pendente e você está recebendo o erro "no persistent volumes available for this claim and no storage class is set", significa que não há volumes persistentes disponíveis para atender à reivindicação e também não há uma classe de armazenamento definida para provisionar automaticamente o volume. Vamos abordar como resolver isso:
+
+    Verifique a disponibilidade de PersistentVolumes (PVs):
+        Verifique se há volumes persistentes disponíveis em seu cluster Kubernetes usando o comando:
+
+        arduino
+
+    kubectl get pv
+
+    Certifique-se de que existam PVs disponíveis que atendam aos requisitos do seu PVC, incluindo capacidade de armazenamento e modo de acesso.
+
+Defina uma classe de armazenamento (StorageClass):
+
+    Se você deseja provisionar volumes persistentes dinamicamente, certifique-se de que uma classe de armazenamento (StorageClass) esteja definida em seu cluster Kubernetes.
+    Você pode verificar as classes de armazenamento disponíveis usando o comando:
+
+    arduino
+
+    kubectl get storageclass
+
+    Se não houver nenhuma classe de armazenamento definida ou se a classe de armazenamento existente não atender aos seus requisitos, crie uma nova classe de armazenamento ou atualize a existente.
+
+Atualize a definição do PVC para usar uma classe de armazenamento:
+
+    Edite a definição do PVC para especificar a classe de armazenamento que deseja usar. Adicione a linha storageClassName: nome-da-classe-de-armazenamento à definição do PVC.
+    Por exemplo:
+
+    yaml
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: my-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: nome-da-classe-de-armazenamento
+  resources:
+    requests:
+      storage: 1Gi
+
+
+
+
+
+- Ajustando
+
+pes-2023-opentelemetry/01-backend.yaml
+
+adicionando:
+
+    storageClassName: local-storage
+
+
+
+
+
+
+
+root@debian10x64:/home/fernando# kubectl get pvc -A
+NAMESPACE               NAME                 STATUS    VOLUME   CAPACITY   ACCESS MODES   STORAGECLASS    AGE
+observability-backend   loki-data-loki-0     Pending                                      local-storage   7s
+observability-backend   mimir-data-mimir-0   Pending                                      local-storage   7s
+root@debian10x64:/home/fernando# kubectl get pvc -A
+NAMESPACE               NAME                 STATUS    VOLUME   CAPACITY   ACCESS MODES   STORAGECLASS    AGE
+observability-backend   loki-data-loki-0     Pending                                      local-storage   10s
+observability-backend   mimir-data-mimir-0   Pending                                      local-storage   10s
+root@debian10x64:/home/fernando#
+root@debian10x64:/home/fernando#
+root@debian10x64:/home/fernando# kubectl describe pvc loki-data-loki-0 -n observability-backend
+Name:          loki-data-loki-0
+Namespace:     observability-backend
+StorageClass:  local-storage
+Status:        Pending
+Volume:
+Labels:        name=loki
+Annotations:   <none>
+Finalizers:    [kubernetes.io/pvc-protection]
+Capacity:
+Access Modes:
+VolumeMode:    Filesystem
+Used By:       loki-0
+Events:
+  Type    Reason                Age   From                         Message
+  ----    ------                ----  ----                         -------
+  Normal  WaitForFirstConsumer  18s   persistentvolume-controller  waiting for first consumer to be created before binding
+  Normal  WaitForPodScheduled   9s    persistentvolume-controller  waiting for pod loki-0 to be scheduled
+root@debian10x64:/home/fernando#
+
+
+
+
+
+
+
+
+root@debian10x64:/home/fernando# kubectl get pods -A
+NAMESPACE               NAME                                  READY   STATUS    RESTARTS   AGE
+kube-system             cilium-operator-788c4f69bc-qndg8      1/1     Running   1          15h
+kube-system             cilium-xqtsm                          1/1     Running   1          15h
+kube-system             coredns-5dd5756b68-84rbg              1/1     Running   1          28d
+kube-system             coredns-5dd5756b68-b82mx              1/1     Running   0          58m
+kube-system             etcd-debian10x64                      1/1     Running   1138       28d
+kube-system             kube-apiserver-debian10x64            1/1     Running   24         28d
+kube-system             kube-controller-manager-debian10x64   1/1     Running   25         28d
+kube-system             kube-proxy-kx4h5                      1/1     Running   24         28d
+kube-system             kube-scheduler-debian10x64            1/1     Running   26         28d
+observability-backend   grafana-65888b98d-wxrnx               1/1     Running   0          37s
+observability-backend   loki-0                                0/1     Pending   0          37s
+observability-backend   mimir-0                               0/1     Pending   0          37s
+observability-backend   tempo-694776547f-v7fj2                1/1     Running   0          37s
+root@debian10x64:/home/fernando#
+root@debian10x64:/home/fernando#
+root@debian10x64:/home/fernando# kubectl describe pod loki-0 -n observability-backend
+Name:           loki-0
+Namespace:      observability-backend
+Priority:       0
+Node:           <none>
+Labels:         apps.kubernetes.io/pod-index=0
+                controller-revision-hash=loki-767d69dbd9
+                name=loki
+                statefulset.kubernetes.io/pod-name=loki-0
+Annotations:    <none>
+Status:         Pending
+IP:
+IPs:            <none>
+Controlled By:  StatefulSet/loki
+Containers:
+  loki:
+    Image:      grafana/loki:2.0.0
+    Port:       3100/TCP
+    Host Port:  0/TCP
+    Args:
+      -config.file=/etc/loki/loki.yaml
+    Liveness:     http-get http://:http-metrics/ready delay=45s timeout=1s period=10s #success=1 #failure=3
+    Readiness:    http-get http://:http-metrics/ready delay=45s timeout=1s period=10s #success=1 #failure=3
+    Environment:  <none>
+    Mounts:
+      /data from loki-data (rw)
+      /etc/loki from loki-config (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-7bwpx (ro)
+Conditions:
+  Type           Status
+  PodScheduled   False
+Volumes:
+  loki-data:
+    Type:       PersistentVolumeClaim (a reference to a PersistentVolumeClaim in the same namespace)
+    ClaimName:  loki-data-loki-0
+    ReadOnly:   false
+  loki-config:
+    Type:        Secret (a volume populated by a Secret)
+    SecretName:  loki-config
+    Optional:    false
+  kube-api-access-7bwpx:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    ConfigMapOptional:       <nil>
+    DownwardAPI:             true
+QoS Class:                   BestEffort
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type     Reason            Age   From               Message
+  ----     ------            ----  ----               -------
+  Warning  FailedScheduling  55s   default-scheduler  0/1 nodes are available: 1 node(s) didn't find available persistent volumes to bind. preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling..
+  Warning  FailedScheduling  53s   default-scheduler  0/1 nodes are available: 1 node(s) didn't find available persistent volumes to bind. preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling..
+root@debian10x64:/home/fernando#
+root@debian10x64:/home/fernando#
+root@debian10x64:/home/fernando# kubectl get pv
+NAME       CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS      CLAIM   STORAGECLASS    REASON   AGE
+local-pv   12Gi       RWO            Recycle          Available           local-storage            70s
+root@debian10x64:/home/fernando#
+root@debian10x64:/home/fernando#
+root@debian10x64:/home/fernando#
+
+
+
+
+
+
+
+
+- Deletado o Pod do kube-scheduler, para reiniciar ele
+
+~~~~bash
+
+root@debian10x64:/home/fernando# kubectl get pods -A -w
+NAMESPACE               NAME                                  READY   STATUS    RESTARTS   AGE
+kube-system             cilium-operator-788c4f69bc-qndg8      1/1     Running   1          15h
+kube-system             cilium-xqtsm                          1/1     Running   1          15h
+kube-system             coredns-5dd5756b68-84rbg              1/1     Running   1          28d
+kube-system             coredns-5dd5756b68-b82mx              1/1     Running   0          62m
+kube-system             etcd-debian10x64                      1/1     Running   1138       28d
+kube-system             kube-apiserver-debian10x64            1/1     Running   24         28d
+kube-system             kube-controller-manager-debian10x64   1/1     Running   25         28d
+kube-system             kube-proxy-kx4h5                      1/1     Running   24         28d
+kube-system             kube-scheduler-debian10x64            1/1     Running   26         49s
+observability-backend   grafana-65888b98d-wxrnx               1/1     Running   0          4m57s
+observability-backend   loki-0                                0/1     Pending   0          2m35s
+observability-backend   mimir-0                               0/1     Pending   0          4m57s
+observability-backend   tempo-694776547f-v7fj2                1/1     Running   0          4m57s
+
+
+~~~~
+
+
+
+
+
+root@debian10x64:/home/fernando# kubectl get pv
+NAME       CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS      CLAIM   STORAGECLASS    REASON   AGE
+local-pv   12Gi       RWO            Recycle          Available           local-storage            6m6s
+root@debian10x64:/home/fernando#
+root@debian10x64:/home/fernando#
+root@debian10x64:/home/fernando# kubectl describe pv local-pv
+Name:              local-pv
+Labels:            <none>
+Annotations:       <none>
+Finalizers:        [kubernetes.io/pv-protection]
+StorageClass:      local-storage
+Status:            Available
+Claim:
+Reclaim Policy:    Recycle
+Access Modes:      RWO
+VolumeMode:        Filesystem
+Capacity:          12Gi
+Node Affinity:
+  Required Terms:
+    Term 0:        kubernetes.io/hostname in [your-node-name]
+Message:
+Source:
+    Type:  LocalVolume (a persistent volume backed by local storage on a node)
+    Path:  /opt/data-pv
+Events:    <none>
+root@debian10x64:/home/fernando# date
+Sun 24 Mar 2024 01:48:21 PM -03
+root@debian10x64:/home/fernando#
+
+
+
+
+
+root@debian10x64:/home/fernando# kubectl get pvc
+No resources found in default namespace.
+root@debian10x64:/home/fernando# kubectl get pvc -A
+NAMESPACE               NAME                 STATUS    VOLUME   CAPACITY   ACCESS MODES   STORAGECLASS    AGE
+observability-backend   loki-data-loki-0     Pending                                      local-storage   6m28s
+observability-backend   mimir-data-mimir-0   Pending                                      local-storage   6m28s
+root@debian10x64:/home/fernando#
+root@debian10x64:/home/fernando#
+root@debian10x64:/home/fernando# kubectl describe pvc -n observability-backend loki-data-loki-0
+Name:          loki-data-loki-0
+Namespace:     observability-backend
+StorageClass:  local-storage
+Status:        Pending
+Volume:
+Labels:        name=loki
+Annotations:   <none>
+Finalizers:    [kubernetes.io/pvc-protection]
+Capacity:
+Access Modes:
+VolumeMode:    Filesystem
+Used By:       loki-0
+Events:
+  Type    Reason                Age                   From                         Message
+  ----    ------                ----                  ----                         -------
+  Normal  WaitForFirstConsumer  6m41s                 persistentvolume-controller  waiting for first consumer to be created before binding
+  Normal  WaitForPodScheduled   32s (x25 over 6m32s)  persistentvolume-controller  waiting for pod loki-0 to be scheduled
+root@debian10x64:/home/fernando#
+
+
+
+
+
+
+- Ajustando diretório
+
+  local:
+    path: /data
+
+
+
+
+
+
+
+root@debian10x64:/home/fernando# kubectl describe pvc -n observability-backend loki-data-loki-0
+Name:          loki-data-loki-0
+Namespace:     observability-backend
+StorageClass:  local-storage
+Status:        Pending
+Volume:
+Labels:        name=loki
+Annotations:   <none>
+Finalizers:    [kubernetes.io/pvc-protection]
+Capacity:
+Access Modes:
+VolumeMode:    Filesystem
+Used By:       loki-0
+Events:
+  Type    Reason                Age   From                         Message
+  ----    ------                ----  ----                         -------
+  Normal  WaitForFirstConsumer  25s   persistentvolume-controller  waiting for first consumer to be created before binding
+  Normal  WaitForPodScheduled   13s   persistentvolume-controller  waiting for pod loki-0 to be scheduled
+
+
+
+root@debian10x64:/home/fernando# kubectl describe pod loki-0 -n observability-backend
+Name:           loki-0
+Namespace:      observability-backend
+Priority:       0
+Node:           <none>
+Labels:         apps.kubernetes.io/pod-index=0
+                controller-revision-hash=loki-767d69dbd9
+                name=loki
+                statefulset.kubernetes.io/pod-name=loki-0
+Annotations:    <none>
+Status:         Pending
+IP:
+Events:
+  Type     Reason            Age   From               Message
+  ----     ------            ----  ----               -------
+  Warning  FailedScheduling  47s   default-scheduler  0/1 nodes are available: 1 node(s) didn't find available persistent volumes to bind. preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling..
+  Warning  FailedScheduling  46s   default-scheduler  0/1 nodes are available: 1 node(s) didn't find available persistent volumes to bind. preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling..
+root@debian10x64:/home/fernando#
+
+
+
 
 
 
