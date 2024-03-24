@@ -5,6 +5,8 @@
  - Loki
  - Mimir
  - Tempo
+ 
+    Grafana Mimir for metrics, Grafana Loki for logs, and Grafana Tempo for traces.
 
 ```bash
 kubectl apply -f 01-backend.yaml
