@@ -1305,7 +1305,42 @@ root@debian10x64:/home/fernando#
 ~~~~
 
 
+
+
+- Abra uma conexão com o serviço do Grafana em uma outra sessão do terminal: 
+
+````bash
+kubectl port-forward -n observability-backend svc/grafana 3000:3000
+````
+
+Não foi possível conectar
+
+O Firefox não conseguiu estabelecer uma conexão com o servidor 192.168.136.128:3000.
+
+
+
+- Pod do Grafana
+
+
+logger=sqlstore.transactions t=2024-03-24T17:29:26.492714494Z level=info msg="Database locked, sleeping then retrying" error="database is locked" retry=0
+logger=sqlstore.transactions t=2024-03-24T17:29:26.503682725Z level=info msg="Database locked, sleeping then retrying" error="database is locked" retry=1
+logger=sqlstore.transactions t=2024-03-24T17:29:26.513910501Z level=info msg="Database locked, sleeping then retrying" error="database is locked" retry=2
+logger=sqlstore.transactions t=2024-03-24T17:29:26.517715716Z level=info msg="Database locked, sleeping then retrying" error="database is locked" retry=0
+logger=cleanup t=2024-03-24T17:39:26.490079605Z level=info msg="Completed cleanup jobs" duration=10.217876ms
+root@debian10x64:/home/fernando# date
+Sun 24 Mar 2024 02:40:55 PM -03
+root@debian10x64:/home/fernando#
+
+
+
+
+- Grafana acessível apenas via VM local:
+
+127.0.0.1:3000
+
+
+
 ## PENDENTE
-- TSHOOT, pods do Loki, Mimir.
-            default-scheduler  0/1 nodes are available: pod has unbound immediate PersistentVolumeClaims. preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling..
-- Subir stack do projeto PES - OpenTelemetry.
+- TSHOOT, Grafana abrir via browser local o mesmo que o VM.
+      Avaliar ngrok.
+- Subir stack do projeto PES - OpenTelemetry. Demais manifestos.
