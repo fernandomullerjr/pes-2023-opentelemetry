@@ -1125,6 +1125,186 @@ root@debian10x64:/home/fernando#
 
 
 
+    Liveness:     http-get http://:http-metrics/ready delay=45s timeout=1s period=10s #success=1 #failure=3
+    Readiness:    http-get http://:http-metrics/ready delay=45s timeout=1s period=10s #success=1 #failure=3
+
+
+
+
+
+- Comentando Liveness e Readiness
+
+
+root@debian10x64:/home/fernando# kubectl apply -f /home/fernando/cursos/opentelemetry/pes-2023-opentelemetry/01-backend.yaml
+namespace/observability-backend unchanged
+secret/loki-config unchanged
+storageclass.storage.k8s.io/local-storage unchanged
+persistentvolume/local-pv unchanged
+service/loki unchanged
+statefulset.apps/loki configured
+configmap/tempo unchanged
+service/tempo unchanged
+deployment.apps/tempo configured
+configmap/mimir unchanged
+service/mimir unchanged
+statefulset.apps/mimir configured
+configmap/dashboards-demo-0 configured
+configmap/grafana-config unchanged
+configmap/grafana-dashboard-provisioning unchanged
+configmap/grafana-dashboards unchanged
+configmap/grafana-dashboards-demo unchanged
+configmap/grafana-datasources configured
+configmap/grafana-notification-channels configured
+service/grafana unchanged
+deployment.apps/grafana unchanged
+root@debian10x64:/home/fernando#
+root@debian10x64:/home/fernando#
+root@debian10x64:/home/fernando# date
+Sun 24 Mar 2024 01:57:25 PM -03
+root@debian10x64:/home/fernando#
+
+
+
+
+
+
+- Segue com erro
+
+
+  Type     Reason            Age   From               Message
+  ----     ------            ----  ----               -------
+  Warning  FailedScheduling  33s   default-scheduler  0/1 nodes are available: 1 node(s) didn't find available persistent volumes to bind. preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling..
+
+
+
+
+
+
+https://stackoverflow.com/questions/60774220/kubernetes-pod-has-unbound-immediate-persistentvolumeclaims
+PersistentVolumeClaims will remain unbound indefinitely if a matching PersistentVolume does not exist. The PersistentVolume is matched with accessModes and capacity. In this case capacity the PV is 10Gi whereas PVC has capacity of 3Gi.
+
+The capacity in the PV needs to same as in the claim i.e 3Gi to fix the unbound immediate PersistentVolumeClaims issue.
+
+
+
+
+
+- ANTES
+
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: local-pv
+spec:
+  capacity:
+    storage: 12Gi
+  accessModes:
+  - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Recycle
+  storageClassName: local-storage
+  local:
+    path: /data
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - your-node-name
+
+- DEPOIS
+
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: local-pv
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes:
+  - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Recycle
+  storageClassName: local-storage
+  local:
+    path: /data
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - debian10x64
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: local-pv-2
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+  - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Recycle
+  storageClassName: local-storage
+  local:
+    path: /data
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - debian10x64
+
+
+
+
+- Foram ajustados:
+nome do node no nodeAffinity, para "debian10x64"
+criado um pv adicional, ficando 2 PV's, um de 10G e um de 1G.
+
+
+- OK, agora todos os Pods subiram e os PVC estão "Bound":
+
+~~~~bash
+
+root@debian10x64:/home/fernando# kubectl get pvc -A
+NAMESPACE               NAME                 STATUS   VOLUME       CAPACITY   ACCESS MODES   STORAGECLASS    AGE
+observability-backend   loki-data-loki-0     Bound    local-pv     10Gi       RWO            local-storage   6m14s
+observability-backend   mimir-data-mimir-0   Bound    local-pv-2   1Gi        RWO            local-storage   6m14s
+root@debian10x64:/home/fernando#
+root@debian10x64:/home/fernando#
+root@debian10x64:/home/fernando# kubectl get pod -A
+NAMESPACE               NAME                                  READY   STATUS    RESTARTS        AGE
+kube-system             cilium-operator-788c4f69bc-qndg8      1/1     Running   1               16h
+kube-system             cilium-xqtsm                          1/1     Running   1               16h
+kube-system             coredns-5dd5756b68-84rbg              1/1     Running   1               28d
+kube-system             coredns-5dd5756b68-b82mx              1/1     Running   0               111m
+kube-system             etcd-debian10x64                      1/1     Running   1138            28d
+kube-system             kube-apiserver-debian10x64            1/1     Running   24              28d
+kube-system             kube-controller-manager-debian10x64   1/1     Running   25              28d
+kube-system             kube-proxy-kx4h5                      1/1     Running   24              28d
+kube-system             kube-scheduler-debian10x64            1/1     Running   26              49m
+observability-backend   grafana-65888b98d-t2jbx               1/1     Running   0               6m16s
+observability-backend   loki-0                                1/1     Running   0               6m16s
+observability-backend   mimir-0                               1/1     Running   1 (5m44s ago)   6m16s
+observability-backend   tempo-694776547f-cs2kb                1/1     Running   0               6m16s
+root@debian10x64:/home/fernando#
+root@debian10x64:/home/fernando#
+root@debian10x64:/home/fernando# date
+Sun 24 Mar 2024 02:35:43 PM -03
+root@debian10x64:/home/fernando#
+
+~~~~
+
+
 ## PENDENTE
 - TSHOOT, pods do Loki, Mimir.
             default-scheduler  0/1 nodes are available: pod has unbound immediate PersistentVolumeClaims. preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling..
