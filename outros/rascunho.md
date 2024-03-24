@@ -343,6 +343,92 @@ root@debian10x64:/home/fernando#
 
 
 
+## PENDENTE
+- TSHOOT, pods do Loki, Mimir.
+            default-scheduler  0/1 nodes are available: pod has unbound immediate PersistentVolumeClaims. preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling..
+- Subir stack do projeto PES - OpenTelemetry.
+
+
+
+
+- Revisando
+
+~~~~bash
+
+root@debian10x64:/home/fernando# kubectl get pvc
+No resources found in default namespace.
+root@debian10x64:/home/fernando# kubectl get pvc -A
+NAMESPACE               NAME                 STATUS    VOLUME   CAPACITY   ACCESS MODES   STORAGECLASS   AGE
+observability-backend   loki-data-loki-0     Pending                                                     14h
+observability-backend   mimir-data-mimir-0   Pending                                                     14h
+root@debian10x64:/home/fernando# date
+Sun 24 Mar 2024 12:53:31 PM -03
+root@debian10x64:/home/fernando#
+
+root@debian10x64:/home/fernando# kubectl get pv
+No resources found
+root@debian10x64:/home/fernando# kubectl get pv -A
+No resources found
+root@debian10x64:/home/fernando#
+
+~~~~
+
+yaml consta o pvc, porém identação e organização tá errada
+
+~~~~yaml
+
+      volumes:
+      - name: loki-data
+        persistentVolumeClaim:
+          claimName: loki-data
+      - name: loki-config
+        secret:
+          secretName: loki-config
+  updateStrategy:
+    type: RollingUpdate
+  volumeClaimTemplates:
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: loki-data
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 10Gi
+~~~~
+
+
+Mimir também
+yaml consta o pvc, porém identação e organização tá errada
+
+~~~~yaml
+
+      volumes:
+      - configMap:
+          name: mimir
+        name: mimir-conf
+      - name: mimir-data
+        persistentVolumeClaim:
+          claimName: mimir-data
+  updateStrategy:
+    type: RollingUpdate
+  volumeClaimTemplates:
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: mimir-data
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi
+~~~~
+
+
+
 
 ## PENDENTE
 - TSHOOT, pods do Loki, Mimir.
