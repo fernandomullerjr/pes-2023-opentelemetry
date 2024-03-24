@@ -95,35 +95,6 @@ spec:
           storage: 10Gi
 ---
 apiVersion: v1
-data:
-  overrides.yaml: |
-    overrides:
-  tempo.yaml: |
-    auth_enabled: false
-    compactor:
-        compaction:
-            compacted_block_retention: 24h
-    distributor:
-        receivers:
-            jaeger:
-                protocols:
-                    thrift_compact:
-                        endpoint: 0.0.0.0:6831
-            otlp:
-                protocols:
-                    grpc:
-                        endpoint: 0.0.0.0:55680
-    ingester: {}
-    server:
-        http_listen_port: 3200
-    storage:
-        trace:
-            backend: local
-            blocklist_poll: 30s
-            local:
-                path: /tmp/tempo/traces
-            wal:
-                path: /var/tempo/wal
 kind: ConfigMap
 metadata:
   name: tempo
@@ -155,6 +126,35 @@ spec:
   selector:
     app: tempo
     name: tempo
+data:
+  overrides.yaml: |
+    overrides:
+  tempo.yaml: |
+    auth_enabled: false
+    compactor:
+        compaction:
+            compacted_block_retention: 24h
+    distributor:
+        receivers:
+            jaeger:
+                protocols:
+                    thrift_compact:
+                        endpoint: 0.0.0.0:6831
+            otlp:
+                protocols:
+                    grpc:
+                        endpoint: 0.0.0.0:55680
+    ingester: {}
+    server:
+        http_listen_port: 3200
+    storage:
+        trace:
+            backend: local
+            blocklist_poll: 30s
+            local:
+                path: /tmp/tempo/traces
+            wal:
+                path: /var/tempo/wal
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -206,6 +206,10 @@ spec:
         name: tempo-conf
 ---
 apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mimir
+  namespace: observability-backend
 data:
   mimir.yaml: |
     blocks_storage:
@@ -223,10 +227,6 @@ data:
     server:
         grpc_listen_port: 9095
         http_listen_port: 8080
-kind: ConfigMap
-metadata:
-  name: mimir
-  namespace: observability-backend
 ---
 apiVersion: v1
 kind: Service
@@ -319,15 +319,19 @@ spec:
           storage: 1Gi
 ---
 apiVersion: v1
-data:
-  demo-overview-.json: '{}'
 kind: ConfigMap
 metadata:
   labels: {}
   name: dashboards-demo-0
   namespace: observability-backend
+data:
+  demo-overview-.json: '{}'
 ---
 apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-config
+  namespace: observability-backend
 data:
   grafana.ini: |
     [analytics]
@@ -346,12 +350,12 @@ data:
     router_logging = true
     [users]
     default_theme = light
-kind: ConfigMap
-metadata:
-  name: grafana-config
-  namespace: observability-backend
 ---
 apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-provisioning
+  namespace: observability-backend
 data:
   dashboards.yml: |
     apiVersion: 1
@@ -372,12 +376,12 @@ data:
             path: /grafana/dashboards-demo
           orgId: 1
           type: file
-kind: ConfigMap
-metadata:
-  name: grafana-dashboard-provisioning
-  namespace: observability-backend
 ---
 apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards
+  namespace: observability-backend
 data:
   cluster.json: |
     {
@@ -489,12 +493,12 @@ data:
       "title": "Cluster",
       "version": 0
     }
-kind: ConfigMap
-metadata:
-  name: grafana-dashboards
-  namespace: observability-backend
 ---
 apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards-demo
+  namespace: observability-backend
 data:
   apps.json: |
     {
@@ -4917,12 +4921,13 @@ data:
     "version": 2,
     "weekStart": ""
     }
-kind: ConfigMap
-metadata:
-  name: grafana-dashboards-demo
-  namespace: observability-backend
 ---
 apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels: {}
+  name: grafana-datasources
+  namespace: observability-backend
 data:
   datasources.yml: |
     apiVersion: 1
@@ -4973,11 +4978,6 @@ data:
           uid: tempo
           url: http://tempo.observability-backend.svc.cluster.local/
           version: 1
-kind: ConfigMap
-metadata:
-  labels: {}
-  name: grafana-datasources
-  namespace: observability-backend
 ---
 apiVersion: v1
 kind: ConfigMap
